@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UP Journey — iROUP Glassmorphism</title>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Prompt', 'Sarabun', sans-serif; height: 100vh; overflow: hidden; }
+input, select, textarea, button { font-family: 'Prompt', 'Sarabun', sans-serif; }
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(75,189,232,0.3); border-radius: 2px; }
+.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(80px); background: #1A3A6B; color: #fff; padding: 10px 22px; border-radius: 25px; font-size: 13px; font-weight: 600; z-index: 9999; transition: transform .25s; pointer-events: none; border: 1px solid rgba(75,189,232,0.4); }
+.toast.show { transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<div class="toast" id="toast"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
+
+// ── BRAND ───────────────────────────────────────────────────────────────────
+const B = { sky:'#4BBDE8', navy:'#1A3A6B', green:'#7BC842', gold:'#F5A623', white:'#FFFFFF' };
+const N = n => Number(n).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const N0 = n => Number(n).toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+const Dt = s => { if (!s) return ''; const [y,m,d] = s.split('-'); return `${+d}/${+m}/${+y+543}`; };
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+// ── RATE DATA ────────────────────────────────────────────────────────────────
+const LV_NAMES = {
+  L1: 'นายกสภา / กรรมการสภาฯ / อธิการบดี / รองอธิการบดี / คณบดี / หัวหน้าส่วนงาน',
+  L2: 'ผู้ช่วยอธิการบดี / รองคณบดี / ผอ.กอง / หัวหน้าสำนักงาน / ประธานหลักสูตร',
+  L3: 'ผศ. / รศ. / ศ. / ผู้ช่วยคณบดี / หัวหน้างาน / พนักงานสายสนับสนุน (ชำนาญการขึ้นไป)',
+  L4: 'อาจารย์ / เจ้าหน้าที่ / พนักงานขับรถ',
+  L5: 'วิทยากรภายนอก / อาจารย์พิเศษ / ผู้ปฏิบัติงานจากภายนอก',
+};
+const LEVELS = Object.values(LV_NAMES);
+const DRIVER_LV = LV_NAMES.L4;
+
+const DAILY_RATES = {
+  [LV_NAMES.L1]: { domestic: 360, asean: 2000, international: 3000 },
+  [LV_NAMES.L2]: { domestic: 300, asean: 2000, international: 3000 },
+  [LV_NAMES.L3]: { domestic: 300, asean: 2000, international: 3000 },
+  [LV_NAMES.L4]: { domestic: 300, asean: 2000, international: 3000 },
+  [LV_NAMES.L5]: { domestic: 300, asean: 2000, international: 3000 },
+};
+const HOTEL_SINGLE = {
+  [LV_NAMES.L1]: { domestic: 3000, asean: 0, international: 0 },
+  [LV_NAMES.L2]: { domestic: 2000, asean: 0, international: 0 },
+  [LV_NAMES.L3]: { domestic: 1700, asean: 7500, international: 3000 },
+  [LV_NAMES.L4]: { domestic: 1700, asean: 3000, international: 7500 },
+  [LV_NAMES.L5]: { domestic: 1700, asean: 3000, international: 7500 },
+};
+const HOTEL_DOUBLE = {
+  [LV_NAMES.L1]: { domestic: 2000, asean: 0, international: 0 },
+  [LV_NAMES.L2]: { domestic: 1200, asean: 0, international: 0 },
+  [LV_NAMES.L3]: { domestic: 1000, asean: 5000, international: 2000 },
+  [LV_NAMES.L4]: { domestic: 1000, asean: 2000, international: 5000 },
+  [LV_NAMES.L5]: { domestic: 1000, asean: 2000, international: 5000 },
+};
+const TR_TYPES = ['Taxi','เครื่องบิน','รถไฟ','รถโดยสาร / รถสาธารณะ','รถราชการ','ค่าผ่านทางด่วน','ค่าน้ำมันรถราชการ','อื่นๆ'];
+
+// ── COUNTRIES ────────────────────────────────────────────────────────────────
+const COUNTRIES = [
+  {th:'พม่า',en:'Myanmar',g:'asean'},{th:'ลาว',en:'Laos',g:'asean'},{th:'กัมพูชา',en:'Cambodia',g:'asean'},
+  {th:'เวียดนาม',en:'Vietnam',g:'asean'},{th:'มาเลเซีย',en:'Malaysia',g:'asean'},{th:'ฟิลิปปินส์',en:'Philippines',g:'asean'},
+  {th:'อินโดนีเซีย',en:'Indonesia',g:'asean'},{th:'สิงคโปร์',en:'Singapore',g:'asean'},{th:'บรูไน',en:'Brunei',g:'asean'},
+  {th:'ติมอร์',en:'Timor-Leste',g:'asean'},{th:'จีน',en:'China',g:'international',note:'รวมฮ่องกง มาเก๊า ไต้หวัน'},
+  {th:'ญี่ปุ่น',en:'Japan',g:'international'},{th:'เกาหลีใต้',en:'South Korea',g:'international'},
+  {th:'ฮ่องกง',en:'Hong Kong',g:'international'},{th:'ไต้หวัน',en:'Taiwan',g:'international'},
+  {th:'อินเดีย',en:'India',g:'international'},{th:'เนปาล',en:'Nepal',g:'international'},
+  {th:'สหรัฐอเมริกา',en:'United States / USA',g:'international'},{th:'แคนาดา',en:'Canada',g:'international'},
+  {th:'สหราชอาณาจักร',en:'United Kingdom / UK',g:'international'},{th:'เยอรมนี',en:'Germany',g:'international'},
+  {th:'ฝรั่งเศส',en:'France',g:'international'},{th:'อิตาลี',en:'Italy',g:'international'},
+  {th:'สเปน',en:'Spain',g:'international'},{th:'เนเธอร์แลนด์',en:'Netherlands',g:'international'},
+  {th:'สวิตเซอร์แลนด์',en:'Switzerland',g:'international'},{th:'ออสเตรเลีย',en:'Australia',g:'international'},
+  {th:'นิวซีแลนด์',en:'New Zealand',g:'international'},{th:'รัสเซีย',en:'Russia',g:'international'},
+  {th:'บราซิล',en:'Brazil',g:'international'},{th:'แอฟริกาใต้',en:'South Africa',g:'international'},
+];
+
+function searchCountries(q) {
+  if (!q || q.length < 1) return [];
+  const lower = q.toLowerCase();
+  return COUNTRIES.filter(c =>
+    c.th.includes(q) || c.en.toLowerCase().includes(lower) ||
+    (c.note && c.note.includes(q))
+  ).slice(0, 8);
+}
+
+// ── DURATION LOGIC ───────────────────────────────────────────────────────────
+function calcSegments(s, e) {
+  const out = [];
+  let cur = new Date(s);
+  while (cur < e) {
+    const next = new Date(Math.min(cur.getTime() + 86400000, e.getTime()));
+    const mins = Math.round((next - cur) / 60000);
+    const h = Math.floor(mins / 60), m = mins % 60;
+    out.push({ h, m, mins, type: mins >= 720 ? 'full' : mins > 360 ? 'half' : 'none' });
+    cur = next;
+  }
+  return out;
+}
+
+function getDuration(d1, t1, d2, t2) {
+  if (!d1 || !t1 || !d2 || !t2) return null;
+  const s = new Date(d1 + 'T' + t1 + ':00');
+  const e = new Date(d2 + 'T' + t2 + ':00');
+  if (isNaN(s) || isNaN(e) || e <= s) return null;
+  const segs = calcSegments(s, e);
+  const full = segs.filter(x => x.type === 'full').length;
+  const half = segs.filter(x => x.type === 'half').length;
+  const totalM = Math.round((e - s) / 60000);
+  const totalH = Math.floor(totalM / 60);
+  const remM = totalM % 60;
+  const days = Math.floor(totalH / 24);
+  const remH = totalH % 24;
+  let label = '';
+  if (days > 0) label += days + ' วัน ';
+  if (remH > 0) label += remH + ' ชม. ';
+  label += remM + ' นาที';
+  return { s, e, segs, full, half, totalH, remM, label };
+}
+
+// ── GLASS STYLE ──────────────────────────────────────────────────────────────
+const glass = (dark) => ({
+  background: dark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.58)',
+  backdropFilter: 'blur(18px)',
+  WebkitBackdropFilter: 'blur(18px)',
+  border: `1px solid ${dark ? 'rgba(255,255,255,0.11)' : 'rgba(255,255,255,0.75)'}`,
+  borderRadius: 16,
+});
+
+// ── INPUT STYLE ──────────────────────────────────────────────────────────────
+const inp = (dark) => ({
+  width: '100%', padding: '9px 13px',
+  background: dark ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.75)',
+  border: `1.5px solid ${dark ? 'rgba(255,255,255,0.15)' : 'rgba(75,189,232,0.35)'}`,
+  borderRadius: 10, fontSize: 13, color: dark ? '#e2f4ff' : '#1A3A6B',
+  outline: 'none', transition: 'border-color .15s',
+  fontFamily: "'Prompt','Sarabun',sans-serif",
+});
+
+const sel = (dark) => ({
+  ...inp(dark), cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none',
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%234BBDE8' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")`,
+  backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', paddingRight: 34,
+});
+
+// ── LABEL ────────────────────────────────────────────────────────────────────
+function Label({ children, dark }) {
+  return <label style={{ display: 'block', fontSize: 11, fontWeight: 600, color: dark ? 'rgba(255,255,255,0.5)' : 'rgba(26,58,107,0.55)', marginBottom: 5 }}>{children}</label>;
+}
+
+// ── GLASS CARD ───────────────────────────────────────────────────────────────
+function GCard({ dark, children, style, p = 16 }) {
+  return <div style={{ ...glass(dark), padding: p, marginBottom: 12, ...style }}>{children}</div>;
+}
+
+// ── PILL SELECT ──────────────────────────────────────────────────────────────
+function PillGroup({ options, value, onChange, dark }) {
+  return (
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      {options.map(([ic, label, val]) => {
+        const active = value === val;
+        return (
+          <button key={val} onClick={() => onChange(val)} style={{
+            padding: '8px 14px', borderRadius: 20, fontSize: 12, fontWeight: active ? 700 : 400,
+            cursor: 'pointer', transition: 'all .15s',
+            background: active ? `linear-gradient(135deg, ${B.sky}30, ${B.sky}15)` : (dark ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.5)'),
+            border: `1.5px solid ${active ? B.sky : (dark ? 'rgba(255,255,255,0.12)' : 'rgba(75,189,232,0.25)')}`,
+            color: active ? B.sky : (dark ? 'rgba(255,255,255,0.5)' : 'rgba(26,58,107,0.6)'),
+            boxShadow: active ? `0 0 14px ${B.sky}35` : 'none',
+          }}>{ic} {label}</button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── STEP 1: TRIP INFO ────────────────────────────────────────────────────────
+function Step1Trip({ dark, trip, setTrip, dur }) {
+  const tx = dark ? '#e2f4ff' : '#1A3A6B';
+  const [countryQ, setCountryQ] = useState('');
+  const [countryResults, setCountryResults] = useState([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  const handleCountrySearch = (q) => {
+    setCountryQ(q);
+    const res = searchCountries(q);
+    setCountryResults(res);
+    setShowDropdown(res.length > 0 && q.length > 0);
+  };
+
+  const selectCountry = (c) => {
+    setTrip(t => ({ ...t, country: c, tripType: c.g }));
+    setCountryQ(c.th + (c.note ? ` (${c.note})` : ''));
+    setShowDropdown(false);
+  };
+
+  return (
+    <>
+      <GCard dark={dark}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: B.sky, marginBottom: 14 }}>📋 ข้อมูลทริป</div>
+        <div style={{ marginBottom: 11 }}>
+          <Label dark={dark}>ชื่อโครงการ / วัตถุประสงค์</Label>
+          <input style={inp(dark)} placeholder="เช่น เข้าร่วมประชุมวิชาการนานาชาติ AUN-QA" value={trip.purpose} onChange={e => setTrip(t => ({ ...t, purpose: e.target.value }))} />
+        </div>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 11 }}>
+          <div style={{ flex: 1 }}>
+            <Label dark={dark}>📅 วันออกเดินทาง</Label>
+            <input type="date" style={inp(dark)} value={trip.d1} onChange={e => setTrip(t => ({ ...t, d1: e.target.value }))} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <Label dark={dark}>⏰ เวลาออก</Label>
+            <input type="time" style={inp(dark)} value={trip.t1} onChange={e => setTrip(t => ({ ...t, t1: e.target.value }))} />
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+          <div style={{ flex: 1 }}>
+            <Label dark={dark}>📅 วันที่กลับ</Label>
+            <input type="date" style={inp(dark)} value={trip.d2} onChange={e => setTrip(t => ({ ...t, d2: e.target.value }))} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <Label dark={dark}>⏰ เวลากลับ</Label>
+            <input type="time" style={inp(dark)} value={trip.t2} onChange={e => setTrip(t => ({ ...t, t2: e.target.value }))} />
+          </div>
+        </div>
+        <div style={{ marginBottom: 14 }}>
+          <Label dark={dark}>ประเภทการเดินทาง</Label>
+          <PillGroup dark={dark} value={trip.tripType} onChange={v => setTrip(t => ({ ...t, tripType: v, country: null }))} options={[
+            ['🇹🇭', 'ในประเทศ', 'domestic'],
+            ['🌏', 'อาเซียน', 'asean'],
+            ['✈️', 'ต่างประเทศ', 'international'],
+          ]} />
+        </div>
+        {trip.tripType !== 'domestic' && (
+          <div style={{ position: 'relative' }}>
+            <Label dark={dark}>🔍 ค้นหาประเทศ (Thai / English)</Label>
+            <input
+              style={inp(dark)}
+              placeholder="เช่น จีน / China / Shanghai..."
+              value={countryQ}
+              onChange={e => handleCountrySearch(e.target.value)}
+              onFocus={() => countryQ && setShowDropdown(countryResults.length > 0)}
+            />
+            {showDropdown && (
+              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, background: dark ? '#0d2240' : '#fff', border: `1px solid ${dark ? 'rgba(75,189,232,0.3)' : 'rgba(75,189,232,0.25)'}`, borderRadius: 10, marginTop: 4, boxShadow: '0 8px 24px rgba(0,0,0,0.2)', overflow: 'hidden' }}>
+                {countryResults.map((c, i) => (
+                  <div key={i} onClick={() => selectCountry(c)} style={{ padding: '10px 14px', cursor: 'pointer', borderBottom: `1px solid ${dark ? 'rgba(255,255,255,0.07)' : '#f0f0f0'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                    onMouseEnter={e => e.currentTarget.style.background = dark ? 'rgba(75,189,232,0.12)' : 'rgba(75,189,232,0.08)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: dark ? '#e2f4ff' : '#1A3A6B' }}>{c.th}</div>
+                      <div style={{ fontSize: 11, color: dark ? 'rgba(255,255,255,0.4)' : '#888' }}>{c.en}{c.note ? ` · ${c.note}` : ''}</div>
+                    </div>
+                    <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: c.g === 'asean' ? 'rgba(123,200,66,0.15)' : 'rgba(75,189,232,0.15)', color: c.g === 'asean' ? B.green : B.sky }}>
+                      {c.g === 'asean' ? 'อาเซียน' : 'ต่างประเทศ'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {trip.country && (
+              <div style={{ marginTop: 8, background: `${B.green}15`, border: `1px solid ${B.green}40`, borderRadius: 8, padding: '7px 12px', fontSize: 12, color: B.green, fontWeight: 600 }}>
+                ✅ {trip.country.th} ({trip.country.en}) — {trip.country.g === 'asean' ? 'ใช้อัตราอาเซียน' : 'ใช้อัตราต่างประเทศ'} {trip.country.note ? `· ${trip.country.note}` : ''}
+              </div>
+            )}
+          </div>
+        )}
+      </GCard>
+
+      {/* Duration box */}
+      {dur ? (
+        <div style={{ background: `linear-gradient(135deg, ${B.navy}ee, ${B.sky}60)`, borderRadius: 14, padding: '16px 18px', border: `1px solid ${B.sky}50` }}>
+          <div style={{ fontSize: 9, color: B.sky, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 5 }}>ระยะเวลาเดินทาง</div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: '#fff', marginBottom: 10 }}>{dur.label}</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {[['วันเต็ม', dur.full + ' วัน', B.sky], ['ครึ่งวัน', dur.half + ' ครึ่ง', B.gold], ['รวม', (dur.full + dur.half * 0.5) + ' วัน', B.green]].map(([l, v, c]) => (
+              <div key={l} style={{ flex: 1, background: 'rgba(255,255,255,0.08)', borderRadius: 9, padding: '8px 10px', border: `1px solid ${c}30`, textAlign: 'center' }}>
+                <div style={{ fontSize: 9, color: c, fontWeight: 700 }}>{l}</div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: '#fff', fontFamily: "'IBM Plex Mono'", marginTop: 2 }}>{v}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 10 }}>
+            {dur.segs.map((seg, i) => (
+              <span key={i} style={{ fontSize: 10, fontWeight: 600, padding: '3px 9px', borderRadius: 20, background: seg.type === 'full' ? `${B.green}20` : seg.type === 'half' ? `${B.gold}20` : 'rgba(255,255,255,0.08)', color: seg.type === 'full' ? B.green : seg.type === 'half' ? B.gold : 'rgba(255,255,255,0.4)', border: `1px solid ${seg.type === 'full' ? B.green + '40' : seg.type === 'half' ? B.gold + '40' : 'rgba(255,255,255,0.1)'}` }}>
+                {seg.type === 'full' ? '✅' : seg.type === 'half' ? '🌗' : '✖️'} ช่วง {i + 1}: {seg.h}ช.{seg.m}น.
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div style={{ background: 'rgba(255,255,255,0.08)', borderRadius: 14, padding: '14px 18px', textAlign: 'center', border: `1px dashed ${dark ? 'rgba(255,255,255,0.15)' : 'rgba(75,189,232,0.3)'}` }}>
+          <div style={{ fontSize: 13, color: dark ? 'rgba(255,255,255,0.35)' : 'rgba(26,58,107,0.4)' }}>กรอกวันที่และเวลาเพื่อดูระยะเวลา</div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ── STEP 2: MEMBERS ──────────────────────────────────────────────────────────
+function Step2Members({ dark, members, setMembers, tripType }) {
+  const tx = dark ? '#e2f4ff' : '#1A3A6B';
+  const t2 = dark ? 'rgba(255,255,255,0.5)' : 'rgba(26,58,107,0.55)';
+  const border = dark ? 'rgba(255,255,255,0.1)' : 'rgba(75,189,232,0.2)';
+  const [open, setOpen] = useState({});
+
+  const addMember = () => {
+    const id = Date.now();
+    setMembers(ms => [...ms, { id, name: '', level: '', pax: 1, fuelMode: 'none', dist: 0, fuelRate: 5, trItems: [], drvType: 'none', drvPax: 1 }]);
+    setOpen(o => ({ ...o, [id]: true }));
+  };
+
+  const updMbr = (id, patch) => setMembers(ms => ms.map(m => m.id === id ? { ...m, ...patch } : m));
+  const delMbr = (id) => setMembers(ms => ms.filter(m => m.id !== id));
+  const addTr = (id) => setMembers(ms => ms.map(m => m.id === id ? { ...m, trItems: [...m.trItems, { type: 'Taxi', note: '', amount: 0 }] } : m));
+  const updTr = (id, i, patch) => setMembers(ms => ms.map(m => m.id === id ? { ...m, trItems: m.trItems.map((x, j) => j === i ? { ...x, ...patch } : x) } : m));
+  const delTr = (id, i) => setMembers(ms => ms.map(m => m.id === id ? { ...m, trItems: m.trItems.filter((_, j) => j !== i) } : m));
+
+  const MEMBER_COLORS = ['#4BBDE8','#7BC842','#F5A623','#a78bfa','#f472b6','#34d399'];
+
+  return (
+    <GCard dark={dark}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: B.sky }}>👥 สมาชิกคณะเดินทาง</div>
+        <button onClick={addMember} style={{ background: `linear-gradient(135deg, ${B.sky}, #0d9ee0)`, border: 'none', borderRadius: 9, padding: '6px 14px', fontSize: 12, fontWeight: 700, color: '#fff', cursor: 'pointer', boxShadow: `0 2px 10px ${B.sky}40` }}>+ เพิ่มสมาชิก</button>
+      </div>
+
+      {members.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '20px 0', color: t2, fontSize: 13 }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>👤</div>
+          ยังไม่มีสมาชิก — กดปุ่ม "เพิ่มสมาชิก"
+        </div>
+      )}
+
+      {members.map((m, mi) => {
+        const color = MEMBER_COLORS[mi % MEMBER_COLORS.length];
+        const isOpen = open[m.id];
+        const isDriver = m.level === DRIVER_LV;
+        return (
+          <div key={m.id} style={{ background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.5)', border: `1px solid ${border}`, borderRadius: 12, marginBottom: 8, overflow: 'hidden' }}>
+            {/* Header row */}
+            <div onClick={() => setOpen(o => ({ ...o, [m.id]: !o[m.id] }))} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', cursor: 'pointer' }}>
+              <div style={{ width: 32, height: 32, borderRadius: '50%', background: `linear-gradient(135deg, ${color}, ${color}90)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+                {m.name ? m.name.charAt(0) : (mi + 1)}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: tx }}>{m.name || `สมาชิก #${mi + 1}`}</div>
+                <div style={{ fontSize: 10, color: t2 }}>{m.level ? m.level.split('/')[0].trim() : 'ยังไม่เลือกระดับ'} · {m.pax} คน</div>
+              </div>
+              <span style={{ fontSize: 14, color: t2 }}>{isOpen ? '▲' : '▼'}</span>
+              <button onClick={e => { e.stopPropagation(); delMbr(m.id); }} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '0 4px' }}>×</button>
+            </div>
+            {/* Body */}
+            {isOpen && (
+              <div style={{ padding: '0 14px 14px', borderTop: `1px solid ${border}` }}>
+                <div style={{ display: 'flex', gap: 10, marginTop: 12, marginBottom: 10 }}>
+                  <div style={{ flex: 2 }}>
+                    <Label dark={dark}>ชื่อ / กลุ่ม</Label>
+                    <input style={inp(dark)} placeholder="เช่น ผศ.ดร.สมชาย" value={m.name} onChange={e => updMbr(m.id, { name: e.target.value })} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <Label dark={dark}>จำนวน (คน)</Label>
+                    <input type="number" min="1" style={inp(dark)} value={m.pax} onChange={e => updMbr(m.id, { pax: parseInt(e.target.value) || 1 })} />
+                  </div>
+                </div>
+                <div style={{ marginBottom: 10 }}>
+                  <Label dark={dark}>ระดับ / ตำแหน่ง</Label>
+                  <select style={sel(dark)} value={m.level} onChange={e => updMbr(m.id, { level: e.target.value })}>
+                    <option value="">-- เลือกระดับ --</option>
+                    {LEVELS.map(l => <option key={l} value={l}>{l}</option>)}
+                  </select>
+                </div>
+                {/* Fuel */}
+                <div style={{ marginBottom: 10 }}>
+                  <Label dark={dark}>⛽ ค่าน้ำมันเชื้อเพลิง</Label>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                    {[['🚗', 'รถยนต์ (5 บ./กม.)', 'car'], ['🏍️', 'มอไซค์ (3 บ./กม.)', 'moto'], ['—', 'ไม่ใช้', 'none']].map(([ic, label, val]) => (
+                      <button key={val} onClick={() => updMbr(m.id, { fuelMode: val, fuelRate: val === 'moto' ? 3 : val === 'car' ? 5 : 5 })} style={{ padding: '6px 12px', borderRadius: 20, fontSize: 11, fontWeight: m.fuelMode === val ? 700 : 400, cursor: 'pointer', background: m.fuelMode === val ? `${B.sky}25` : 'transparent', border: `1.5px solid ${m.fuelMode === val ? B.sky : border}`, color: m.fuelMode === val ? B.sky : t2 }}>{ic} {label}</button>
+                    ))}
+                  </div>
+                  {m.fuelMode !== 'none' && (
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <div style={{ flex: 1 }}>
+                        <Label dark={dark}>ระยะทาง (กม. เที่ยวเดียว)</Label>
+                        <input type="number" min="0" style={inp(dark)} value={m.dist || ''} placeholder="0" onChange={e => updMbr(m.id, { dist: parseFloat(e.target.value) || 0 })} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <Label dark={dark}>อัตรา (บ./กม.)</Label>
+                        <input type="number" min="0" style={inp(dark)} value={m.fuelRate} onChange={e => updMbr(m.id, { fuelRate: parseFloat(e.target.value) || 0 })} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {/* Transport items */}
+                <div style={{ marginBottom: 8 }}>
+                  <Label dark={dark}>🚕 ค่าพาหนะอื่น</Label>
+                  {m.trItems.map((tr, ti) => (
+                    <div key={ti} style={{ display: 'flex', gap: 6, marginBottom: 6, alignItems: 'center' }}>
+                      <select style={{ ...sel(dark), flex: '0 0 130px', fontSize: 11 }} value={tr.type} onChange={e => updTr(m.id, ti, { type: e.target.value })}>
+                        {TR_TYPES.map(t => <option key={t}>{t}</option>)}
+                      </select>
+                      <input style={{ ...inp(dark), flex: 1, fontSize: 11 }} placeholder="หมายเหตุ" value={tr.note} onChange={e => updTr(m.id, ti, { note: e.target.value })} />
+                      <input type="number" min="0" style={{ ...inp(dark), width: 80, textAlign: 'right', fontFamily: "'IBM Plex Mono'", fontSize: 12 }} placeholder="0" value={tr.amount || ''} onChange={e => updTr(m.id, ti, { amount: parseFloat(e.target.value) || 0 })} />
+                      <button onClick={() => delTr(m.id, ti)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 18, flexShrink: 0 }}>×</button>
+                    </div>
+                  ))}
+                  <button onClick={() => addTr(m.id)} style={{ background: 'transparent', border: `1px solid ${border}`, borderRadius: 7, padding: '5px 12px', fontSize: 11, color: t2, cursor: 'pointer' }}>+ เพิ่มรายการ</button>
+                </div>
+                {/* Driver bonus */}
+                {isDriver && (
+                  <div style={{ background: dark ? 'rgba(245,166,35,0.08)' : 'rgba(245,166,35,0.06)', border: `1px solid ${B.gold}30`, borderRadius: 10, padding: 12 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: B.gold, marginBottom: 8 }}>🚙 เงินเพิ่มพิเศษ พขร.</div>
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <div style={{ flex: 1 }}>
+                        <Label dark={dark}>ประเภท</Label>
+                        <select style={sel(dark)} value={m.drvType} onChange={e => updMbr(m.id, { drvType: e.target.value })}>
+                          <option value="none">ไม่มีเงินเพิ่ม</option>
+                          <option value="inprov">ในจังหวัด (+100 บ./วัน)</option>
+                          <option value="outprov">นอกจังหวัด (+150 บ./วัน)</option>
+                        </select>
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <Label dark={dark}>จำนวน พขร. (คน)</Label>
+                        <input type="number" min="1" style={inp(dark)} value={m.drvPax} onChange={e => updMbr(m.id, { drvPax: parseInt(e.target.value) || 1 })} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </GCard>
+  );
+}
+
+// ── STEP 3: HOTEL ────────────────────────────────────────────────────────────
+function Step3Hotel({ dark, hotels, setHotels, tripType }) {
+  const tx = dark ? '#e2f4ff' : '#1A3A6B';
+  const t2 = dark ? 'rgba(255,255,255,0.5)' : 'rgba(26,58,107,0.55)';
+  const border = dark ? 'rgba(255,255,255,0.1)' : 'rgba(75,189,232,0.2)';
+
+  const addHotel = () => setHotels(hs => [...hs, { id: Date.now(), label: '', nights: 1, rooms: 1, roomType: 'single', htlTripType: tripType, level: LEVELS[2], override: null }]);
+  const updH = (id, patch) => setHotels(hs => hs.map(h => h.id === id ? { ...h, ...patch } : h));
+  const delH = (id) => setHotels(hs => hs.filter(h => h.id !== id));
+
+  const getRate = (lv, tt, rt) => {
+    const tbl = rt === 'double' ? HOTEL_DOUBLE : HOTEL_SINGLE;
+    return (tbl[lv] && tbl[lv][tt]) ?? 0;
+  };
+
+  return (
+    <GCard dark={dark}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: B.sky }}>🏨 ค่าที่พัก</div>
+        <button onClick={addHotel} style={{ background: `linear-gradient(135deg, ${B.sky}, #0d9ee0)`, border: 'none', borderRadius: 9, padding: '6px 14px', fontSize: 12, fontWeight: 700, color: '#fff', cursor: 'pointer', boxShadow: `0 2px 10px ${B.sky}40` }}>+ เพิ่มช่วง</button>
+      </div>
+      <div style={{ fontSize: 11, background: `${B.sky}12`, border: `1px solid ${B.sky}25`, borderRadius: 8, padding: '7px 12px', color: dark ? 'rgba(75,189,232,0.8)' : B.navy, marginBottom: 12 }}>
+        💡 เพิ่มแต่ละช่วงแยกกัน เช่น คืน 1-2 พักเดี่ยว / คืน 3-5 พักคู่ต่างประเทศ
+      </div>
+      {hotels.length === 0 && (
+        <div style={{ textAlign: 'center', padding: '16px 0', color: t2, fontSize: 13 }}>ยังไม่มีรายการที่พัก</div>
+      )}
+      {hotels.map(h => {
+        const rate = h.override ?? getRate(h.level, h.htlTripType, h.roomType);
+        const total = rate === 0 ? null : rate * h.nights * h.rooms;
+        return (
+          <div key={h.id} style={{ background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.5)', border: `1px solid ${border}`, borderRadius: 12, padding: 14, marginBottom: 10 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: tx }}>🏨 {h.label || 'ช่วงที่พัก'}</span>
+              <button onClick={() => delH(h.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 18 }}>×</button>
+            </div>
+            <div style={{ marginBottom: 8 }}>
+              <Label dark={dark}>ชื่อช่วง / โรงแรม</Label>
+              <input style={inp(dark)} placeholder="เช่น โรงแรมในกรุงเทพ / โรงแรมเซี่ยงไฮ้" value={h.label} onChange={e => updH(h.id, { label: e.target.value })} />
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+              <div style={{ flex: 1 }}>
+                <Label dark={dark}>จำนวนคืน</Label>
+                <input type="number" min="0" style={inp(dark)} value={h.nights} onChange={e => updH(h.id, { nights: parseInt(e.target.value) || 0 })} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <Label dark={dark}>จำนวนห้อง</Label>
+                <input type="number" min="1" style={inp(dark)} value={h.rooms} onChange={e => updH(h.id, { rooms: parseInt(e.target.value) || 1 })} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <Label dark={dark}>อัตราพิเศษ (ว่าง=ตาราง)</Label>
+                <input type="number" min="0" style={inp(dark)} placeholder={rate === 0 ? 'ตามจริง' : rate} value={h.override || ''} onChange={e => updH(h.id, { override: parseFloat(e.target.value) || null })} />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+              <div style={{ flex: 1 }}>
+                <Label dark={dark}>ประเภทการเดินทาง</Label>
+                <select style={sel(dark)} value={h.htlTripType} onChange={e => updH(h.id, { htlTripType: e.target.value })}>
+                  <option value="domestic">🇹🇭 ในประเทศ</option>
+                  <option value="asean">🌏 อาเซียน</option>
+                  <option value="international">✈️ ต่างประเทศ</option>
+                </select>
+              </div>
+              <div style={{ flex: 1 }}>
+                <Label dark={dark}>ระดับอ้างอิง</Label>
+                <select style={sel(dark)} value={h.level} onChange={e => updH(h.id, { level: e.target.value })}>
+                  {LEVELS.map(l => <option key={l} value={l}>{l.split('/')[0].trim()}</option>)}
+                </select>
+              </div>
+            </div>
+            <div style={{ marginBottom: 8 }}>
+              <Label dark={dark}>ประเภทห้อง</Label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {[['🛏️', 'พักเดี่ยว', 'single'], ['🛏🛏', 'พักคู่', 'double']].map(([ic, label, val]) => (
+                  <button key={val} onClick={() => updH(h.id, { roomType: val })} style={{ flex: 1, padding: '8px', borderRadius: 9, fontSize: 12, fontWeight: h.roomType === val ? 700 : 400, cursor: 'pointer', background: h.roomType === val ? `${B.sky}20` : 'transparent', border: `1.5px solid ${h.roomType === val ? B.sky : border}`, color: h.roomType === val ? B.sky : t2 }}>{ic} {label}</button>
+                ))}
+              </div>
+            </div>
+            <div style={{ background: `${B.green}15`, border: `1px solid ${B.green}30`, borderRadius: 8, padding: '8px 12px', fontSize: 12, color: B.green, fontWeight: 600 }}>
+              💰 {h.nights} คืน × {h.rooms} ห้อง × {rate === 0 ? 'ตามจริง' : N0(rate) + ' บ.'} = {total !== null ? N0(total) + ' บาท' : 'ตามจริง'}
+            </div>
+          </div>
+        );
+      })}
+    </GCard>
+  );
+}
+
+// ── STEP 4: RESULT ───────────────────────────────────────────────────────────
+function Step4Result({ dark, result }) {
+  const tx = dark ? '#e2f4ff' : '#1A3A6B';
+  const t2 = dark ? 'rgba(255,255,255,0.5)' : 'rgba(26,58,107,0.55)';
+  const border = dark ? 'rgba(255,255,255,0.1)' : 'rgba(75,189,232,0.2)';
+  const cpRef = useRef();
+
+  if (!result) return (
+    <div style={{ textAlign: 'center', padding: '40px 20px', color: t2 }}>
+      <div style={{ fontSize: 40, marginBottom: 12 }}>✨</div>
+      <div style={{ fontSize: 14, fontWeight: 600 }}>กรอกข้อมูลแล้วกด "คำนวณผล" เพื่อดูสรุป</div>
+    </div>
+  );
+
+  const doCopy = () => {
+    const txt = cpRef.current?.innerText || '';
+    navigator.clipboard.writeText(txt).then(() => toast('✅ Copy แล้ว!')).catch(() => toast('❌ ไม่สามารถ copy ได้'));
+  };
+
+  const ttLabel = { domestic: 'ในประเทศ', asean: 'ต่างประเทศ (อาเซียน)', international: 'ต่างประเทศ (ประเทศอื่น)' }[result.tripType] || '';
+
+  return (
+    <>
+      {/* Hero total */}
+      <div style={{ background: `linear-gradient(135deg, ${B.navy}f0, ${B.sky}80)`, borderRadius: 16, padding: '20px 22px', marginBottom: 12, position: 'relative', overflow: 'hidden', border: `1px solid ${B.sky}50` }}>
+        <div style={{ position: 'absolute', top: -30, right: -30, width: 160, height: 160, borderRadius: '50%', background: `${B.sky}20`, filter: 'blur(30px)' }} />
+        <img src="uploads/ดีไซน์ที่ยังไม่ได้ตั้งชื่อ.png" alt="Globy" style={{ position: 'absolute', bottom: -10, right: 8, width: 85, pointerEvents: 'none', filter: 'drop-shadow(0 0 18px rgba(75,189,232,0.5))' }} />
+        <div style={{ fontSize: 9, color: B.sky, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 5 }}>ยอดรวมค่าใช้จ่ายทั้งหมด</div>
+        <div style={{ fontSize: 38, fontWeight: 800, color: '#fff', fontFamily: "'IBM Plex Mono'", lineHeight: 1 }}>{N(result.grandTotal)}</div>
+        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginTop: 4, marginBottom: 14 }}>บาท · {result.purpose || '(ไม่ระบุโครงการ)'} · {ttLabel}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
+          {[['🍽️ เบี้ยเลี้ยง', result.totalDaily, B.sky], ['🏨 ที่พัก', result.totalHotel, B.gold], ['⛽ น้ำมัน', result.totalFuel, B.green], ['🚕 พาหนะ', result.totalTransport, '#a78bfa']].map(([l, v, c]) => (
+            <div key={l} style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)', borderRadius: 10, padding: '9px 10px', border: `1px solid ${c}30`, textAlign: 'center' }}>
+              <div style={{ fontSize: 9, color: c, fontWeight: 700, marginBottom: 3 }}>{l}</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', fontFamily: "'IBM Plex Mono'" }}>{N0(v)}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Duration */}
+      <GCard dark={dark} p={14}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: B.sky, marginBottom: 8 }}>⏱️ ระยะเวลา</div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {[['วันเต็ม', result.dur.full + ' วัน', B.sky], ['ครึ่งวัน', result.dur.half + ' ครึ่ง', B.gold], ['รวม', (result.dur.full + result.dur.half * 0.5) + ' วัน', B.green]].map(([l, v, c]) => (
+            <div key={l} style={{ flex: 1, textAlign: 'center', background: dark ? 'rgba(255,255,255,0.05)' : `${c}10`, borderRadius: 8, padding: '8px 6px', border: `1px solid ${c}25` }}>
+              <div style={{ fontSize: 9, color: c, fontWeight: 700 }}>{l}</div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: tx, fontFamily: "'IBM Plex Mono'", marginTop: 2 }}>{v}</div>
+            </div>
+          ))}
+        </div>
+      </GCard>
+
+      {/* Per member */}
+      <GCard dark={dark} p={14}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: B.sky, marginBottom: 10 }}>👥 รายละเอียดรายบุคคล</div>
+        {result.memberResults.map((m, i) => (
+          <div key={i} style={{ marginBottom: i < result.memberResults.length - 1 ? 10 : 0 }}>
+            {m.err ? (
+              <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 8, padding: '8px 12px', fontSize: 12, color: '#ef4444' }}>⚠️ {m.name || 'สมาชิก'}: {m.err}</div>
+            ) : (
+              <div style={{ background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.5)', border: `1px solid ${border}`, borderRadius: 10, overflow: 'hidden' }}>
+                <div style={{ padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: dark ? 'rgba(75,189,232,0.07)' : `${B.sky}08` }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: tx }}>{m.name || `สมาชิก #${i + 1}`} <span style={{ fontSize: 10, color: t2, fontWeight: 400 }}>× {m.pax} คน</span></div>
+                    <div style={{ fontSize: 10, color: t2 }}>{m.level?.split('/')[0]?.trim()}</div>
+                  </div>
+                  <div style={{ fontSize: 17, fontWeight: 800, color: B.sky, fontFamily: "'IBM Plex Mono'" }}>{N(m.memberTotal)} บ.</div>
+                </div>
+                <div style={{ padding: '10px 14px' }}>
+                  {[
+                    ['🍽️ เบี้ยเลี้ยง', m.dailyTotal],
+                    ['⛽ ค่าน้ำมัน', m.fuelCost],
+                    ...m.trItems.map(x => [`🚕 ${x.type}${x.note ? ' — ' + x.note : ''}`, x.amount]),
+                  ].map(([l, v], j) => v > 0 && (
+                    <div key={j} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: `1px dashed ${border}`, fontSize: 12 }}>
+                      <span style={{ color: t2 }}>{l}</span>
+                      <span style={{ fontWeight: 600, color: tx, fontFamily: "'IBM Plex Mono'" }}>{N(v)} บ.</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </GCard>
+
+      {/* Hotels */}
+      {result.hotels.length > 0 && (
+        <GCard dark={dark} p={14}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: B.sky, marginBottom: 10 }}>🏨 รายละเอียดที่พัก</div>
+          {result.hotels.map((h, i) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: i < result.hotels.length - 1 ? `1px dashed ${border}` : 'none', fontSize: 12 }}>
+              <div>
+                <div style={{ color: tx, fontWeight: 600 }}>{h.label || 'ที่พัก'}</div>
+                <div style={{ color: t2, fontSize: 10 }}>{h.nights} คืน × {h.rooms} ห้อง · {h.roomType === 'double' ? 'พักคู่' : 'พักเดี่ยว'}</div>
+              </div>
+              <div style={{ fontWeight: 700, color: B.gold, fontFamily: "'IBM Plex Mono'", fontSize: 13 }}>{h.cost !== null ? N(h.cost) + ' บ.' : 'ตามจริง'}</div>
+            </div>
+          ))}
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 10, padding: '8px 12px', background: B.navy, borderRadius: 8 }}>
+            <span style={{ fontWeight: 700, color: B.gold }}>รวมค่าที่พัก</span>
+            <span style={{ fontWeight: 800, color: '#fff', fontFamily: "'IBM Plex Mono'" }}>{N(result.totalHotel)} บาท</span>
+          </div>
+        </GCard>
+      )}
+
+      {/* Meal deduct */}
+      {result.mealDeduct > 0 && (
+        <GCard dark={dark} p={14}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+            <span style={{ color: '#ef4444' }}>🍽️ หักค่าอาหาร</span>
+            <span style={{ fontWeight: 700, color: '#ef4444', fontFamily: "'IBM Plex Mono'" }}>-{N(result.mealDeduct)} บ.</span>
+          </div>
+        </GCard>
+      )}
+
+      {/* Copy text */}
+      <GCard dark={dark} p={14}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: B.sky, marginBottom: 8 }}>📋 ข้อความสรุป</div>
+        <div ref={cpRef} style={{ background: dark ? '#050d1a' : '#f0f8ff', border: `1px solid ${dark ? 'rgba(75,189,232,0.2)' : 'rgba(75,189,232,0.3)'}`, borderRadius: 10, padding: 12, fontFamily: "'IBM Plex Mono'", fontSize: 10.5, color: dark ? '#64d690' : '#1A3A6B', lineHeight: 1.85, whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 220, overflowY: 'auto', marginBottom: 10 }}>
+          {result.copyText}
+        </div>
+        <button onClick={doCopy} style={{ width: '100%', background: `linear-gradient(135deg, ${B.sky}, #0d9ee0)`, border: 'none', borderRadius: 10, padding: 11, fontSize: 13, fontWeight: 700, color: '#fff', cursor: 'pointer', boxShadow: `0 3px 14px ${B.sky}40` }}>📋 Copy ข้อความ</button>
+      </GCard>
+    </>
+  );
+}
+
+// ── CALCULATE ────────────────────────────────────────────────────────────────
+function calculate({ trip, members, hotels, meals, dur }) {
+  const { tripType } = trip;
+  const full = dur.full, half = dur.half;
+
+  const getRate = (lv, tt, rt) => {
+    const tbl = rt === 'double' ? HOTEL_DOUBLE : HOTEL_SINGLE;
+    return (tbl[lv] && tbl[lv][tt]) ?? 0;
+  };
+
+  const memberResults = members.map(m => {
+    if (!m.level) return { ...m, err: 'ยังไม่เลือกระดับ', memberTotal: 0 };
+    const rate = (DAILY_RATES[m.level]?.[tripType]) ?? 0;
+    const fAmt = full * rate * m.pax;
+    const hAmt = half * rate * 0.5 * m.pax;
+    const drv = m.level === DRIVER_LV && m.drvType !== 'none'
+      ? Math.ceil(full + half * 0.5) * (m.drvType === 'outprov' ? 150 : 100) * m.drvPax : 0;
+    const dailyTotal = fAmt + hAmt + drv;
+    const fuelCost = m.fuelMode === 'none' ? 0 : m.dist * 2 * m.fuelRate;
+    const trTotal = m.trItems.reduce((s, x) => s + (x.amount || 0), 0);
+    const memberTotal = dailyTotal + fuelCost + trTotal;
+    return { ...m, rate, fAmt, hAmt, drv, dailyTotal, fuelCost, trTotal, memberTotal };
+  });
+
+  const hotelResults = hotels.map(h => {
+    const rate = h.override ?? getRate(h.level, h.htlTripType, h.roomType);
+    const cost = rate === 0 ? null : rate * h.nights * h.rooms;
+    return { ...h, cost };
+  });
+
+  const totalDaily = memberResults.reduce((s, m) => s + (m.dailyTotal || 0), 0);
+  const totalFuel = memberResults.reduce((s, m) => s + (m.fuelCost || 0), 0);
+  const totalTransport = memberResults.reduce((s, m) => s + (m.trTotal || 0), 0);
+  const totalHotel = hotelResults.reduce((s, h) => s + (h.cost || 0), 0);
+  const mealDeduct = tripType === 'domestic' ? (meals.count * 100 * meals.pax) : 0;
+  const grandTotal = totalDaily + totalFuel + totalTransport + totalHotel - mealDeduct;
+
+  const ttLabel = { domestic: 'ในประเทศ', asean: 'ต่างประเทศ (อาเซียน)', international: 'ต่างประเทศ (ประเทศอื่น)' }[tripType];
+  const totalPax = members.reduce((s, m) => s + (m.pax || 1), 0);
+
+  const lines = [
+    'สรุปค่าใช้จ่ายในการเดินทางไปปฏิบัติงาน',
+    'มหาวิทยาลัยพะเยา',
+    '═══════════════════════════════════════════',
+    trip.purpose ? `โครงการ    : ${trip.purpose}` : '',
+    `ประเภท     : ${ttLabel} | รวม ${totalPax} คน`,
+    `ออกเดินทาง : ${Dt(trip.d1)} เวลา ${trip.t1} น.`,
+    `สิ้นสุด    : ${Dt(trip.d2)} เวลา ${trip.t2} น.`,
+    `รวมเวลา    : ${dur.label}`,
+    `           วันเต็ม ${full} วัน + ครึ่งวัน ${half} ครึ่ง`,
+    '',
+    'รายการค่าใช้จ่ายรายบุคคล',
+    '───────────────────────────────────────────',
+    ...memberResults.map(m => m.err
+      ? `${m.name || 'สมาชิก'}: ${m.err}`
+      : [
+        `${(m.name || `สมาชิก`).padEnd(20)}: ${m.pax} คน | ${m.level?.split('/')[0]?.trim() || ''}`,
+        `  เบี้ยเลี้ยง : ${N(m.dailyTotal)} บาท`,
+        m.fuelCost > 0 ? `  ค่าน้ำมัน  : ${N(m.fuelCost)} บาท` : '',
+        ...m.trItems.map(x => `  ${x.type} : ${N(x.amount)} บาท${x.note ? ` (${x.note})` : ''}`),
+        `  รวม        : ${N(m.memberTotal)} บาท`,
+      ].filter(Boolean).join('\n')),
+    '',
+    'ค่าที่พัก',
+    '───────────────────────────────────────────',
+    ...hotelResults.map(h => `${h.label || 'ที่พัก'} : ${h.nights} คืน × ${h.rooms} ห้อง = ${h.cost !== null ? N(h.cost) + ' บาท' : 'ตามจริง'}`),
+    mealDeduct > 0 ? `หักค่าอาหาร : -${N(mealDeduct)} บาท` : '',
+    '═══════════════════════════════════════════',
+    `ยอดรวมทั้งสิ้น  : ${N(grandTotal)} บาท`,
+  ].filter(l => l !== undefined);
+
+  return {
+    tripType, purpose: trip.purpose,
+    dur, grandTotal, totalDaily, totalFuel, totalTransport, totalHotel, mealDeduct,
+    memberResults, hotels: hotelResults,
+    copyText: lines.join('\n'),
+  };
+}
+
+// ── HISTORY ──────────────────────────────────────────────────────────────────
+function saveHistory(result) {
+  try {
+    const hist = JSON.parse(localStorage.getItem('upj_history') || '[]');
+    hist.unshift({ id: Date.now(), purpose: result.purpose, grandTotal: result.grandTotal, tripType: result.tripType, date: new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' }) });
+    localStorage.setItem('upj_history', JSON.stringify(hist.slice(0, 20)));
+  } catch {}
+}
+
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem('upj_history') || '[]'); } catch { return []; }
+}
+
+// ── MAIN APP ─────────────────────────────────────────────────────────────────
+function App() {
+  const today = new Date().toISOString().split('T')[0];
+  const [isDark, setIsDark] = useState(false);
+  const [step, setStep] = useState(1);
+  const [tab, setTab] = useState('calc');
+  const [trip, setTrip] = useState({ purpose: '', d1: today, t1: '08:00', d2: today, t2: '17:00', tripType: 'domestic', country: null });
+  const [members, setMembers] = useState([]);
+  const [hotels, setHotels] = useState([]);
+  const [meals, setMeals] = useState({ count: 0, pax: 1 });
+  const [result, setResult] = useState(null);
+  const [history, setHistory] = useState(loadHistory);
+  const [showHistory, setShowHistory] = useState(false);
+
+  const dur = getDuration(trip.d1, trip.t1, trip.d2, trip.t2);
+
+  const bg = isDark
+    ? 'linear-gradient(135deg, #060f1f 0%, #0a1a35 50%, #060d1a 100%)'
+    : 'linear-gradient(135deg, #b8dff4 0%, #d8f0ff 40%, #a8d8f0 100%)';
+
+  const tx = isDark ? '#e2f4ff' : '#1A3A6B';
+  const t2 = isDark ? 'rgba(255,255,255,0.45)' : 'rgba(26,58,107,0.5)';
+
+  const doCalc = () => {
+    if (!dur) { toast('⚠️ กรุณากรอกวันที่/เวลาให้ครบ'); return; }
+    if (members.length === 0) { toast('⚠️ กรุณาเพิ่มสมาชิกอย่างน้อย 1 คน'); return; }
+    const res = calculate({ trip, members, hotels, meals, dur });
+    setResult(res);
+    saveHistory(res);
+    setHistory(loadHistory());
+    setStep(4);
+    toast('✅ คำนวณเสร็จแล้ว!');
+  };
+
+  const steps = ['ข้อมูลทริป', 'สมาชิก', 'ที่พัก', 'สรุปผล'];
+
+  // Live total for sidebar
+  const liveTotals = dur && members.length > 0 ? (() => {
+    const r = members.reduce((acc, m) => {
+      if (!m.level) return acc;
+      const rate = (DAILY_RATES[m.level]?.[trip.tripType]) ?? 0;
+      const daily = (dur.full * rate + dur.half * rate * 0.5) * m.pax;
+      const fuel = m.fuelMode !== 'none' ? m.dist * 2 * m.fuelRate : 0;
+      const tr = m.trItems.reduce((s, x) => s + (x.amount || 0), 0);
+      return { daily: acc.daily + daily, fuel: acc.fuel + fuel, tr: acc.tr + tr };
+    }, { daily: 0, fuel: 0, tr: 0 });
+    const hotel = hotels.reduce((s, h) => {
+      const rate = h.override ?? ((h.roomType === 'double' ? HOTEL_DOUBLE : HOTEL_SINGLE)[h.level]?.[h.htlTripType] ?? 0);
+      return s + (rate === 0 ? 0 : rate * h.nights * h.rooms);
+    }, 0);
+    return { ...r, hotel, total: r.daily + r.fuel + r.tr + hotel };
+  })() : null;
+
+  return (
+    <div style={{ width: '100vw', height: '100vh', background: bg, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative' }}>
+      {/* Blobs */}
+      <div style={{ position: 'fixed', top: -100, right: -80, width: 350, height: 350, borderRadius: '50%', background: `${B.sky}35`, filter: 'blur(70px)', pointerEvents: 'none', zIndex: 0 }} />
+      <div style={{ position: 'fixed', bottom: -80, left: -60, width: 280, height: 280, borderRadius: '50%', background: `${B.gold}25`, filter: 'blur(60px)', pointerEvents: 'none', zIndex: 0 }} />
+      <div style={{ position: 'fixed', top: '45%', left: '35%', width: 200, height: 200, borderRadius: '50%', background: `${B.green}20`, filter: 'blur(50px)', pointerEvents: 'none', zIndex: 0 }} />
+
+      {/* Header */}
+      <div style={{ ...glass(isDark), borderRadius: 0, borderLeft: 'none', borderRight: 'none', borderTop: 'none', padding: '10px 18px', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, zIndex: 20, position: 'relative' }}>
+        <div style={{ width: 36, height: 36, background: `linear-gradient(135deg, ${B.sky}, ${B.navy})`, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, color: '#fff', flexShrink: 0 }}>มพ</div>
+        <img src="uploads/ดีไซน์ที่ยังไม่ได้ตั้งชื่อ.png" alt="Globy" style={{ width: 40, height: 40, objectFit: 'contain', flexShrink: 0, filter: 'drop-shadow(0 2px 8px rgba(26,58,107,0.2))' }} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 15, fontWeight: 800, color: tx, lineHeight: 1.2 }}>UP Journey</div>
+          <div style={{ fontSize: 10, color: t2 }}>iROUP · คำนวณค่าใช้จ่ายการเดินทาง · มหาวิทยาลัยพะเยา</div>
+        </div>
+        <button onClick={() => setShowHistory(h => !h)} style={{ ...glass(isDark), border: `1px solid ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(75,189,232,0.3)'}`, borderRadius: 9, padding: '6px 12px', fontSize: 11, fontWeight: 600, color: t2, cursor: 'pointer' }}>🕐 ประวัติ</button>
+        <button onClick={() => setIsDark(d => !d)} style={{ ...glass(isDark), border: `1px solid ${isDark ? `${B.sky}50` : `${B.navy}20`}`, borderRadius: 20, padding: '6px 14px', fontSize: 12, fontWeight: 700, color: isDark ? B.sky : B.navy, cursor: 'pointer' }}>{isDark ? '☀️ Light' : '🌙 Dark'}</button>
+      </div>
+
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative', zIndex: 10 }}>
+        {/* Sidebar */}
+        <div style={{ ...glass(isDark), borderRadius: 0, borderTop: 'none', borderBottom: 'none', borderLeft: 'none', width: 200, display: 'flex', flexDirection: 'column', flexShrink: 0, padding: '16px 10px' }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: t2, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 12, padding: '0 6px' }}>ขั้นตอน</div>
+          {steps.map((s, i) => {
+            const n = i + 1, active = step === n, done = step > n;
+            return (
+              <button key={i} onClick={() => setStep(n)} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 10px', borderRadius: 10, marginBottom: 3, background: active ? (isDark ? 'rgba(75,189,232,0.18)' : 'rgba(75,189,232,0.12)') : 'transparent', border: `1.5px solid ${active ? B.sky + '70' : 'transparent'}`, cursor: 'pointer', transition: 'all .18s', textAlign: 'left' }}>
+                <div style={{ width: 26, height: 26, borderRadius: '50%', flexShrink: 0, background: done ? B.green : active ? B.sky : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(26,58,107,0.08)'), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: done || active ? '#fff' : t2, boxShadow: active ? `0 0 14px ${B.sky}55` : 'none', transition: 'all .2s' }}>{done ? '✓' : n}</div>
+                <span style={{ fontSize: 13, fontWeight: active ? 700 : 400, color: active ? (isDark ? B.sky : B.navy) : t2 }}>{s}</span>
+              </button>
+            );
+          })}
+
+          {/* Globy mascot in sidebar */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '10px 0 6px' }}>
+            <img src="uploads/ดีไซน์ที่ยังไม่ได้ตั้งชื่อ.png" alt="Globy" style={{ width: 85, objectFit: 'contain', filter: 'drop-shadow(0 4px 14px rgba(26,58,107,0.18))' }} />
+            <div style={{ fontSize: 9, fontWeight: 700, color: isDark ? 'rgba(75,189,232,0.5)' : 'rgba(26,58,107,0.35)', letterSpacing: .8, textTransform: 'uppercase', marginTop: 2 }}>iROUP</div>
+          </div>
+
+          {/* Live KPI */}
+          {liveTotals && (
+            <div style={{ ...glass(isDark), padding: 12, borderRadius: 12, marginTop: 'auto' }}>
+              <div style={{ fontSize: 9, fontWeight: 700, color: B.sky, letterSpacing: .8, textTransform: 'uppercase', marginBottom: 8 }}>ยอดชั่วคราว</div>
+              {[['เบี้ยเลี้ยง', liveTotals.daily, B.sky], ['ที่พัก', liveTotals.hotel, B.gold], ['พาหนะ+น้ำมัน', liveTotals.fuel + liveTotals.tr, B.green]].map(([l, v, c]) => (
+                <div key={l} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                  <span style={{ fontSize: 10, color: t2 }}>{l}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: c, fontFamily: "'IBM Plex Mono'" }}>{N0(v)}</span>
+                </div>
+              ))}
+              <div style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(26,58,107,0.12)'}`, marginTop: 8, paddingTop: 8, display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: tx }}>รวม</span>
+                <span style={{ fontSize: 15, fontWeight: 800, color: B.sky, fontFamily: "'IBM Plex Mono'" }}>{N0(liveTotals.total)}</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Main content */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {/* Progress bar */}
+          <div style={{ padding: '10px 18px 0', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ flex: 1, height: 5, background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(26,58,107,0.1)', borderRadius: 3, overflow: 'hidden' }}>
+                <div style={{ width: `${(step / 4) * 100}%`, height: '100%', background: `linear-gradient(90deg, ${B.sky}, ${B.green})`, borderRadius: 3, transition: 'width .35s ease', boxShadow: `0 0 10px ${B.sky}70` }} />
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 700, color: B.sky, whiteSpace: 'nowrap' }}>ขั้น {step} / 4</span>
+            </div>
+          </div>
+
+          {/* Step content */}
+          <div style={{ flex: 1, overflow: 'auto', padding: '14px 18px' }}>
+            {step === 1 && <Step1Trip dark={isDark} trip={trip} setTrip={setTrip} dur={dur} />}
+            {step === 2 && <Step2Members dark={isDark} members={members} setMembers={setMembers} tripType={trip.tripType} />}
+            {step === 3 && (
+              <>
+                <Step3Hotel dark={isDark} hotels={hotels} setHotels={setHotels} tripType={trip.tripType} />
+                {trip.tripType === 'domestic' && (
+                  <GCard dark={isDark}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: B.sky, marginBottom: 10 }}>🍽️ หักค่าอาหาร (มีการเลี้ยง)</div>
+                    <div style={{ fontSize: 11, color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(26,58,107,0.5)', marginBottom: 10 }}>หักมื้อละ 100 บาท/คน จากเบี้ยเลี้ยง</div>
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <div style={{ flex: 1 }}>
+                        <Label dark={isDark}>จำนวนมื้อที่มีการเลี้ยง</Label>
+                        <input type="number" min="0" style={inp(isDark)} value={meals.count} onChange={e => setMeals(m => ({ ...m, count: parseInt(e.target.value) || 0 }))} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <Label dark={isDark}>จำนวนคนที่ถูกหัก</Label>
+                        <input type="number" min="1" style={inp(isDark)} value={meals.pax} onChange={e => setMeals(m => ({ ...m, pax: parseInt(e.target.value) || 1 }))} />
+                      </div>
+                    </div>
+                    {meals.count > 0 && (
+                      <div style={{ marginTop: 10, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 8, padding: '7px 12px', fontSize: 12, color: '#ef4444', fontWeight: 600 }}>
+                        หักรวม: {meals.count} มื้อ × {meals.pax} คน × 100 บ. = {N0(meals.count * 100 * meals.pax)} บาท
+                      </div>
+                    )}
+                  </GCard>
+                )}
+              </>
+            )}
+            {step === 4 && <Step4Result dark={isDark} result={result} />}
+          </div>
+
+          {/* Bottom nav */}
+          <div style={{ padding: '10px 18px 14px', flexShrink: 0, display: 'flex', gap: 10 }}>
+            {step > 1 && (
+              <button onClick={() => setStep(s => s - 1)} style={{ ...glass(isDark), border: `1px solid ${isDark ? 'rgba(255,255,255,0.15)' : 'rgba(75,189,232,0.3)'}`, borderRadius: 12, padding: '10px 18px', fontSize: 13, fontWeight: 600, color: t2, cursor: 'pointer' }}>← ย้อนกลับ</button>
+            )}
+            {step < 3 && (
+              <button onClick={() => setStep(s => s + 1)} style={{ flex: 1, background: `linear-gradient(135deg, ${B.sky}, #0d9ee0)`, border: 'none', borderRadius: 12, padding: '11px', fontSize: 14, fontWeight: 700, color: '#fff', cursor: 'pointer', boxShadow: `0 4px 18px ${B.sky}45` }}>ถัดไป →</button>
+            )}
+            {step === 3 && (
+              <button onClick={doCalc} style={{ flex: 1, background: `linear-gradient(135deg, ${B.gold}, #e8820a)`, border: 'none', borderRadius: 12, padding: '11px', fontSize: 14, fontWeight: 800, color: '#fff', cursor: 'pointer', boxShadow: `0 4px 18px ${B.gold}50` }}>✨ คำนวณผล</button>
+            )}
+            {step === 4 && (
+              <button onClick={() => { setStep(1); setResult(null); toast('🗑️ ล้างข้อมูลแล้ว'); setMembers([]); setHotels([]); setMeals({ count: 0, pax: 1 }); }} style={{ flex: 1, background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 12, padding: '10px', fontSize: 13, fontWeight: 600, color: '#ef4444', cursor: 'pointer' }}>🗑️ เริ่มใหม่</button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* History overlay */}
+      {showHistory && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }} onClick={() => setShowHistory(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ ...glass(isDark), borderRadius: 18, padding: 24, width: 420, maxHeight: '80vh', overflow: 'auto', boxShadow: '0 20px 60px rgba(0,0,0,0.4)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div style={{ fontSize: 16, fontWeight: 800, color: B.sky }}>🕐 ประวัติการคำนวณ</div>
+              <button onClick={() => setShowHistory(false)} style={{ background: 'none', border: 'none', fontSize: 20, color: t2, cursor: 'pointer' }}>×</button>
+            </div>
+            {history.length === 0 ? (
+              <div style={{ textAlign: 'center', color: t2, padding: '20px 0', fontSize: 13 }}>ยังไม่มีประวัติ</div>
+            ) : history.map((h, i) => (
+              <div key={h.id} style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.6)', border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(75,189,232,0.2)'}`, borderRadius: 10, padding: '12px 14px', marginBottom: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: tx }}>{h.purpose || '(ไม่ระบุโครงการ)'}</div>
+                  <div style={{ fontSize: 11, color: t2, marginTop: 3 }}>{h.date} · <span style={{ background: h.tripType === 'domestic' ? `${B.green}20` : `${B.sky}20`, color: h.tripType === 'domestic' ? B.green : B.sky, padding: '1px 7px', borderRadius: 20, fontWeight: 600 }}>{h.tripType === 'domestic' ? 'ในประเทศ' : h.tripType === 'asean' ? 'อาเซียน' : 'ต่างประเทศ'}</span></div>
+                </div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: B.gold, fontFamily: "'IBM Plex Mono'" }}>{N0(h.grandTotal)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+</script>
+</body>
+</html>
